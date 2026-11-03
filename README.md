@@ -2,6 +2,12 @@
 
 Protótipo de um agente de atendimento por texto para a loja fictícia Empório da Música (Campo Grande/MS), feito para o desafio técnico de AI Engineer da Artefact. A **Melô** responde sobre produtos (preço, estoque, promoção), políticas da loja (pagamento, troca, frete, garantia), status de pedidos e devoluções, e recusa o que foge do escopo.
 
+## Para quem vai avaliar
+
+- **Sem rodar nada:** as 5 conversas completas estão em [`exemplos/`](exemplos/) (catálogo, preço/pagamento, loja e fora de escopo, devolução com regras da política, privacidade de pedido).
+- **Rodando:** o repositório **não traz chave de API** (o `.env` é ignorado pelo git de propósito). Você precisa de uma chave própria da DeepSeek, que é barata (o modelo padrão é o `deepseek-flash`), e colocar em `.env` seguindo "Como rodar" abaixo. Os testes (`pytest -q`) não precisam de chave.
+- **Sem chave da DeepSeek:** o agente fala com qualquer API compatível com OpenAI. Defina `EMPORIO_BASE_URL`, `EMPORIO_MODEL` e `EMPORIO_API_KEY` no `.env` (por exemplo, OpenAI ou um servidor local como Ollama). O modelo precisa suportar function calling. Só testei com a DeepSeek.
+
 ## Como rodar
 
 Requisitos: Python 3.11+ e uma chave da API da DeepSeek (https://platform.deepseek.com/api_keys).
