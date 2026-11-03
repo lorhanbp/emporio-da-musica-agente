@@ -46,8 +46,9 @@ def main():
         agente = Agente(verbose=False)
         linhas = [f"# {nome}\n", f"_Modelo: `{config.MODELO}` · data de referência: {config.HOJE}_\n"]
         for fala in falas:
+            antes = len(agente.mensagens)
             resposta = agente.responder(fala)
-            usadas = [b["name"] for m in agente.mensagens[-6:] if m["role"] == "assistant" and isinstance(m["content"], list)
+            usadas = [b["name"] for m in agente.mensagens[antes:] if m["role"] == "assistant" and isinstance(m["content"], list)
                       for b in m["content"] if b["type"] == "tool_use"]
             linhas += [f"**Cliente:** {fala}\n", f"**Melô:** {resposta}\n"]
             if usadas:
