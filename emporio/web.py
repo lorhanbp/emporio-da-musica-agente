@@ -56,7 +56,10 @@ class Handler(BaseHTTPRequestHandler):
         self._enviar(200, pagina.encode(), "text/html; charset=utf-8")
 
     def do_POST(self):
-        dados = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or "{}")
+        try:
+            dados = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or "{}")
+        except ValueError:
+            return self._enviar(400, b'{"erro": "requisicao invalida"}', "application/json")
         sessao, mensagem = str(dados.get("sessao", ""))[:40], str(dados.get("mensagem", ""))[:2000]
         with _trava:
             agente = _agentes.setdefault(sessao, Agente())
