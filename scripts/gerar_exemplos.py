@@ -1,5 +1,5 @@
 """Roda conversas roteirizadas contra o agente real e salva em exemplos/*.md.
-Uso: python scripts/gerar_exemplos.py [cenario ...]   (precisa de GEMINI_API_KEY)"""
+Uso: python scripts/gerar_exemplos.py [cenario ...]   (precisa de DEEPSEEK_API_KEY)"""
 import sys
 from pathlib import Path
 
@@ -47,7 +47,7 @@ def main():
         for fala in falas:
             antes = len(agente.mensagens)
             resposta = agente.responder(fala)
-            usadas = [p.function_call.name for m in agente.mensagens[antes:] for p in m.parts or [] if p.function_call]
+            usadas = [c["function"]["name"] for m in agente.mensagens[antes:] for c in m.get("tool_calls", [])]
             linhas += [f"**Cliente:** {fala}\n", f"**Melô:** {resposta}\n"]
             if usadas:
                 linhas.append(f"<sub>ferramentas nesta rodada: {', '.join(dict.fromkeys(usadas))}</sub>\n")

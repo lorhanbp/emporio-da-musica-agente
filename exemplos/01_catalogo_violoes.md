@@ -1,36 +1,34 @@
 # 01_catalogo_violoes
 
-_Modelo: `gemini-3.5-flash` · data de referência: 2026-03-23_
+_Modelo: `deepseek-flash` · data de referência: 2026-03-23_
 
 **Cliente:** Oi! Quais opções de violões disponíveis custando até R$1000?
 
-**Melô:** Olá! Separei 8 de 12 opções de violões disponíveis por até R$ 1.000:
+**Melô:** Oi! Boas-vindas à Empório da Música 🎸 Separei 8 de 12 violões de até R$1.000:
 
-- *Tagima Memphis AC-39 Nylon Natural*: R$ 429,90 (Nylon)
-- *Rozini RC-104 Nylon Estudante*: R$ 459,90 (Nylon)
-- *Shelby SN-100 Folk Aço Preto*: R$ 549,00 (Aço)
-- *Giannini GF-1R Aço Folk Sunburst*: R$ 579,90 (Aço)
-- *Yamaha C40 Nylon Natural*: R$ 599,90 (Nylon)
-- *Giannini GN-15 Nylon Cedr Natural*: R$ 689,00 (Nylon)
-- *Yamaha F310 Aço Natural*: R$ 699,90 (Aço)
-- *Tagima Dallas Tuner Aço Natural*: R$ 749,00 (Aço)
+- Tagima Memphis AC-39 Nylon Natural – R$429,90
+- Rozini RC-104 Nylon Estudante – R$459,90
+- Shelby SN-100 Folk Aço Preto – R$549,00
+- Giannini GF-1R Aço Folk Sunburst – R$579,90
+- Yamaha C40 Nylon Natural – R$599,90
+- Giannini GN-15 Nylon Cedr Natural – R$689,00
+- Yamaha F310 Aço Natural – R$699,90
+- Tagima Dallas Tuner Aço Natural – R$749,00
 
-Você prefere cordas de nylon ou aço? Se quiser, posso refinar por marca ou faixa de preço! 🎸
-
-Precisa de mais alguma coisa?
+Tem mais 4 opções nessa faixa. Quer que eu mostre o resto, ou prefere filtrar por marca, tipo de corda (nylon ou aço) ou uma faixa de preço?
 
 <sub>ferramentas nesta rodada: buscar_produtos</sub>
 
 **Cliente:** Qual dessas é melhor pra quem tá começando? Dá pra parcelar a mais cara em quantas vezes?
 
-**Melô:** Para quem está começando, os violões com *cordas de nylon* costumam ser os mais recomendados, pois são mais macios para os dedos. O *Yamaha C40* (R$ 599,90) e o *Tagima Memphis AC-39* (R$ 429,90) são excelentes opções para iniciantes. Se o seu foco for sertanejo, pop ou rock e preferir som mais brilhante, os de *aço* (como o *Yamaha F310*) também servem bem!
+**Melô:** Boa pergunta! Pra quem tá começando, minha sugestão é o *Yamaha C40 Nylon Natural* (R$599,90): cordas de nylon machucam menos a ponta dos dedos no início, top em spruce e escala 650mm - é um modelo de entrada bem tradicional. Se você prefere o som metálico do aço, aí vale o *Yamaha F310 Aço* (R$699,90).
 
-Sobre a opção mais cara da lista (o *Tagima Dallas Tuner Aço*, por R$ 749,00), você pode parcelar assim:
+E fechando a lista que ficou faltando, nessa faixa de até R$1.000 tem também:
+- Shelby SGD-195E Elétrico Aço Sunburst – R$799,00
+- Yamaha C70 Nylon Natural – R$849,00
+- Tagima Woodstock Dreadnought Natural – R$899,00
+- Tagima TW-7 7 Cordas Aço Natural – R$999,00
 
-- *Cartão de crédito*: em até 7x de R$ 107,00 sem juros
-- *PIX à vista*: R$ 711,55 (com 5% de desconto)
-- *Frete*: grátis para Campo Grande e região 
+Sobre parcelamento: da lista que te mandei antes, a mais cara é a *Tagima Dallas Tuner* (R$749,00) - dá em até *7x sem juros* de R$107,00, ou R$711,55 no PIX. E se considerar todas as 12, o topo é a *Tagima TW-7 7 Cordas* (R$999,00) - até *9x sem juros* de R$111,00, ou R$949,05 no PIX. Frete grátis aqui em Campo Grande e região.
 
-Precisa de mais alguma coisa?
-
-<sub>ferramentas nesta rodada: simular_pagamento</sub>
+<sub>ferramentas nesta rodada: buscar_produtos, simular_pagamento</sub>

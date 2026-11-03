@@ -3,7 +3,7 @@ import argparse
 import os
 import sys
 
-from google.genai import errors
+import openai
 
 from . import config
 from .agente import Agente
@@ -16,8 +16,8 @@ def main():
     ap.add_argument("--transcricao", help="salva a conversa em markdown neste arquivo")
     args = ap.parse_args()
 
-    if not os.getenv("GEMINI_API_KEY"):
-        sys.exit("Falta GEMINI_API_KEY: copie .env.example para .env e preencha.")
+    if not (os.getenv("EMPORIO_API_KEY") or os.getenv("DEEPSEEK_API_KEY")):
+        sys.exit("Falta DEEPSEEK_API_KEY: copie .env.example para .env e preencha.")
     agente = Agente(args.sessao, verbose=args.verbose)
     print("Empório da Música: atendimento (Ctrl+C ou 'sair' para encerrar)\n")
     transcricao = []
@@ -27,7 +27,7 @@ def main():
                 continue
             try:
                 resposta = agente.responder(texto)
-            except errors.APIError as e:
+            except openai.APIError as e:
                 print(f"\n[erro na API: {e.__class__.__name__}] tente de novo.\n")
                 continue
             print(f"\nMelô: {resposta}\n")

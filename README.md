@@ -4,12 +4,12 @@ Protótipo de um agente de atendimento por texto para a loja fictícia Empório 
 
 ## Como rodar
 
-Requisitos: Python 3.11+ e uma chave da API do Gemini (https://aistudio.google.com/apikey, tem plano gratuito).
+Requisitos: Python 3.11+ e uma chave da API da DeepSeek (https://platform.deepseek.com/api_keys).
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env        # preencha GEMINI_API_KEY
+cp .env.example .env        # preencha DEEPSEEK_API_KEY
 python -m emporio           # conversa no terminal
 ```
 
@@ -24,14 +24,14 @@ Opções do CLI:
 Testes (não usam a API): `pytest -q`.
 Conversas de exemplo: `python scripts/gerar_exemplos.py [cenario ...]` (regrava `exemplos/*.md`; sem argumentos roda os 5 cenários).
 
-> **Cota do plano gratuito do Gemini:** 5 requisições/minuto e cerca de 20/dia **por modelo**. O agente espera e tenta de novo em erro 429/503, mas uma conversa usa 2–3 chamadas por pergunta, então a cota diária acaba rápido. Se estourar, use outro modelo Flash com `EMPORIO_MODEL` ou espere o reset.
+> **Custo:** o `deepseek-flash` é o modelo mais barato da DeepSeek; uma conversa de teste custa frações de centavo. O SDK repete automaticamente chamadas que falham por limite de taxa ou erro de servidor (429/5xx).
 
-Variáveis opcionais: `EMPORIO_MODEL` (padrão `gemini-2.5-flash`) e `EMPORIO_HOJE` (data de referência, veja "Suposições").
+Variáveis opcionais: `EMPORIO_MODEL` (padrão `deepseek-flash`), `EMPORIO_BASE_URL` (padrão `https://api.deepseek.com`; serve para qualquer API compatível com OpenAI, usando então `EMPORIO_API_KEY`) e `EMPORIO_HOJE` (data de referência, veja "Suposições").
 
 ## Arquitetura
 
 ```
-cliente ──► CLI ──► Agente (loop de function calling) ──► Gemini
+cliente ──► CLI ──► Agente (loop de function calling) ──► DeepSeek
                          │                                   │
                          └── ferramentas (Python puro) ◄─────┘
                               ├─ buscar_produtos / detalhes_produto   → CSVs em memória
@@ -49,7 +49,7 @@ cliente ──► CLI ──► Agente (loop de function calling) ──► Gemi
 
 **Políticas como ferramenta, não como prompt.** O PDF foi convertido para `data/politicas.md`, dividido em nove tópicos. A ferramenta `consultar_politicas` devolve só o trecho relevante. O prompt de sistema fica enxuto (persona + regras de ouro), e o modelo precisa *escolher* consultar o manual em vez de responder de memória. Com um manual tão curto, colocar tudo no prompt também funcionaria; escolhi a ferramenta pelo controle e pela clareza do trace (`--verbose`).
 
-**Modelo: Gemini 2.5 Flash via API do Google (`google-genai`).** Function calling nativo, bom português, baixa latência e plano gratuito, o que importa para um chat e para quem for rodar o projeto sem custo. A troca para outro modelo Gemini é só `EMPORIO_MODEL`. Temperatura 0,3 para respostas consistentes, e a chamada automática de funções do SDK fica desligada: o loop é manual para registrar cada ferramenta (`--verbose`) e controlar o histórico.
+**Modelo: `deepseek-flash` (DeepSeek, API compatível com OpenAI).** É o modelo mais barato da DeepSeek, com function calling nativo e bom português, o que combina com um chat de alto volume e baixa margem. Usei o SDK `openai` apontando para a DeepSeek: o código não fica preso a um provedor, e trocar de modelo ou de provedor é só configuração (`EMPORIO_MODEL`, `EMPORIO_BASE_URL`). Temperatura 0,3 para respostas consistentes. O loop de ferramentas é manual, para registrar cada chamada (`--verbose`) e controlar o histórico. O modelo devolve um `reasoning_content` nos turnos com ferramenta, que a API exige de volta; o histórico guarda a mensagem completa.
 
 **Persona e prompt.** Seguem o manual (seção 7.1): "informal mas profissional, como um amigo que entende de música". O prompt define quando usar cada ferramenta, regras de ouro (nunca inventar preço/estoque/prazo, promoção sempre com preço original, PIX não acumula com promoção) e o tratamento de fora de escopo e de tentativas de mudar as instruções.
 
@@ -77,7 +77,7 @@ cliente ──► CLI ──► Agente (loop de function calling) ──► Gemi
 - Não há verificação forte de identidade: e-mail/telefone são "algo que o cliente sabe", o que é fraco para um sistema real (um código por SMS/WhatsApp resolveria).
 - Busca de produtos por substring normalizada. "Violão" ≠ "violões" no texto livre; o filtro de categoria cobre os casos comuns, mas busca semântica (embeddings) ajudaria com sinônimos ("cavaco", "guitarra de 7 cordas") e perguntas vagas ("algo pra começar").
 - O horário da loja não conhece feriados; o `encaminhar_para_humano` só grava em arquivo, sem fila nem notificação.
-- O Gemini às vezes diz que "vai encaminhar" sem chamar a ferramenta (aconteceu nos testes). Há uma trava no agente: se a resposta promete encaminhar/registrar e `encaminhar_para_humano` não foi chamada, o agente cobra o modelo antes de responder. A trava é por palavra-chave, então é uma rede de segurança, não garantia.
+- O modelo às vezes diz que "vai encaminhar" sem chamar a ferramenta (aconteceu nos testes com o Gemini, que usei antes). Há uma trava no agente: se a resposta promete encaminhar/registrar e `encaminhar_para_humano` não foi chamada, o agente cobra o modelo antes de responder. A trava é por palavra-chave, então é uma rede de segurança, não garantia.
 - Sem avaliação automatizada de qualidade das respostas. Com mais tempo: um conjunto de conversas com critérios (LLM-as-judge) rodando no CI, para pegar regressões de prompt.
 - O histórico enviado ao modelo é limitado às últimas ~40 mensagens (corte em turno de usuário); conversas muito longas perdem o começo.
 - Sem streaming nem canal real (WhatsApp); a interface é CLI.
@@ -85,7 +85,7 @@ cliente ──► CLI ──► Agente (loop de function calling) ──► Gemi
 
 ## Uso de assistentes de código
 
-Usei o **Claude Code** (Anthropic) como par de programação; o agente em si roda no Gemini. Como foi usado:
+Usei o **Claude Code** (Anthropic) como par de programação; o agente em si roda na DeepSeek. Como foi usado:
 
 - Pedi a ele um levantamento de armadilhas nos dados (e-mail duplicado, estoque 0 em produto "ativo", promoções inativas, inconsistências no manual). As suposições acima vêm dessa análise.
 - A arquitetura (function calling, sem RAG, cálculos em código) foi definida na conversa com o Claude Code, que escreveu a primeira versão dos módulos, dos testes e deste README.
