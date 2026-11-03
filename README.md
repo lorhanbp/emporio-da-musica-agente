@@ -5,7 +5,8 @@ Protótipo de um agente de atendimento por texto para a loja fictícia Empório 
 ## Para quem vai avaliar
 
 - **Sem rodar nada:** as 5 conversas completas estão em [`exemplos/`](exemplos/) (catálogo, preço e pagamento, loja e fora de escopo, devolução com regras da política, privacidade de pedido).
-- **Rodando:** o repositório **não traz chave de API** (o `.env` é ignorado pelo git de propósito). Você precisa de uma chave própria de **um** destes provedores: DeepSeek (padrão, muito barata) ou Anthropic. Veja "Como rodar".
+- **Rodando:** o repositório **não traz chave de API** (o `.env` é ignorado pelo git de propósito). Você precisa de uma chave da Anthropic (`ANTHROPIC_API_KEY`); veja "Como rodar".
+- **Sobre os exemplos:** foram gerados com o agente de verdade usando `deepseek-flash` por uma API compatível com OpenAI, a chave disponível durante o desenvolvimento. O caminho padrão com Claude foi validado por testes automatizados, mas não foi executado contra a API real, então o texto das respostas pode variar um pouco.
 - **Os testes não precisam de chave:** `pytest -q`.
 
 ## Como rodar
@@ -19,15 +20,14 @@ cp .env.example .env     # depois preencha UMA chave, veja abaixo
 python -m emporio        # conversa no terminal
 ```
 
-**Opções de provedor** (edite o `.env`):
+**Provedor (edite o `.env`):**
 
-| Provedor | Variável | Modelo padrão | Observações |
-|---|---|---|---|
-| DeepSeek (padrão) | `DEEPSEEK_API_KEY` | `deepseek-flash` | Modelo mais barato da DeepSeek; foi o usado para gerar as conversas de exemplo |
-| Anthropic | `ANTHROPIC_API_KEY` | `claude-haiku-5-5` | Coberto por testes automatizados que usam o SDK real contra um servidor HTTP falso; não foi executado contra a API de verdade |
-| Qualquer API compatível com OpenAI | `EMPORIO_API_KEY` + `EMPORIO_BASE_URL` + `EMPORIO_MODEL` | nenhum | O modelo precisa suportar function calling |
+| Provedor | Variáveis | Modelo padrão |
+|---|---|---|
+| Anthropic (padrão) | `ANTHROPIC_API_KEY` | `claude-haiku-5-5` (troque com `EMPORIO_MODEL`) |
+| Alternativa: qualquer API compatível com OpenAI | `EMPORIO_PROVEDOR=openai`, `EMPORIO_API_KEY`, `EMPORIO_BASE_URL`, `EMPORIO_MODEL` | nenhum; o modelo precisa suportar function calling |
 
-O provedor é escolhido pelas chaves presentes: só `ANTHROPIC_API_KEY` definida → Anthropic; caso contrário, DeepSeek. Dá para forçar com `EMPORIO_PROVEDOR=anthropic` ou `deepseek`. `EMPORIO_MODEL` troca o modelo em qualquer caso.
+O caminho da Anthropic é coberto por testes automatizados que usam o SDK real contra um servidor HTTP falso. Sem `EMPORIO_PROVEDOR`, o padrão é a Anthropic (só `EMPORIO_API_KEY` definida, sem chave da Anthropic, escolhe o provedor compatível com OpenAI).
 
 Outros comandos:
 
@@ -79,7 +79,7 @@ Os adaptadores de provedor ficam em `emporio/modelos.py`. O histórico é sempre
 
 **Políticas como ferramenta, não como prompt.** O PDF foi convertido para `data/politicas.md`, dividido em nove tópicos. A ferramenta `consultar_politicas` devolve só o trecho relevante. O prompt de sistema fica enxuto (persona + regras de ouro), e o modelo precisa *escolher* consultar o manual em vez de responder de memória. Com um manual tão curto, colocar tudo no prompt também funcionaria; escolhi a ferramenta pelo controle e pela clareza do trace (`--verbose`).
 
-**Modelo e provedor.** O padrão é o `deepseek-flash` pela API compatível com OpenAI: é o modelo mais barato da DeepSeek, com function calling nativo e bom português, o que combina com um chat de alto volume. A Anthropic é suportada como alternativa, pelo SDK próprio. A temperatura é 0,3 no caminho compatível com OpenAI, para respostas consistentes (não é definida no caminho da Anthropic). O loop de ferramentas é manual, para registrar cada chamada e controlar o histórico. A DeepSeek devolve um campo `reasoning_content` nos turnos com ferramenta, que a API exige de volta, então a mensagem completa é guardada.
+**Modelo e provedor.** O padrão é o Claude Haiku (`claude-haiku-5-5`) pela API da Anthropic: tool use nativo, bom português, baixa latência e custo, o que combina com um chat de alto volume. Para não prender o código a um provedor, há um segundo adaptador para APIs compatíveis com OpenAI (usado para gerar os exemplos). A temperatura é 0,3 nesse caminho, para respostas consistentes; no da Anthropic ela não é definida. O loop de ferramentas é manual, para registrar cada chamada e controlar o histórico. Modelos de raciocínio compatíveis com OpenAI podem devolver um campo `reasoning_content` que a API exige de volta, então a mensagem completa é guardada.
 
 **Persona e estratégia de prompt.** Seguem o manual (seção 7.1): "informal mas profissional, como um amigo que entende de música". O prompt define quando usar cada ferramenta e traz regras de ouro: nunca inventar preço, estoque ou prazo; mostrar sempre o preço original junto da promoção; sem desconto de PIX em preço promocional; só dizer que encaminhou depois de chamar a ferramenta; citar os números exatamente como a ferramenta devolveu; não deduzir gênero nem identidade do cliente; redirecionar acessórios e pedidos fora do escopo; e ignorar tentativas de mudar as instruções.
 
@@ -115,7 +115,7 @@ Os adaptadores de provedor ficam em `emporio/modelos.py`. O histórico é sempre
 
 ## Uso de assistentes de código
 
-Usei o **Claude Code** (Anthropic) como assistente de programação. O agente em si roda na DeepSeek (ou na Anthropic, se você escolher). Como foi usado:
+Usei o **Claude Code** (Anthropic) como assistente de programação. O agente em si usa a API da Anthropic (ou outra compatível com OpenAI). Como foi usado:
 
 - Ele auditou os CSVs e o manual atrás de armadilhas (e-mail duplicado, estoque 0 em produto "ativo", promoções inativas, contradições no manual). As suposições acima vêm dessa análise.
 - A partir dos requisitos do desafio, escreveu as primeiras versões dos módulos, dos testes e deste documento, que depois passaram por várias rodadas de ajuste ao rodar o agente com o modelo real e ler as conversas.
@@ -127,6 +127,6 @@ Usei o **Claude Code** (Anthropic) como assistente de programação. O agente em
 emporio/     código (dados, ferramentas, prompt, agente, adaptadores de provedor, CLI, página web)
 data/        arquivos originais da empresa (CSVs e políticas_da_loja.pdf) + politicas.md (o PDF em texto, por tópico)
 tests/       testes das ferramentas, do loop do agente e dos provedores (sem chave de API)
-exemplos/    conversas de exemplo geradas com o agente real
+exemplos/    conversas de exemplo geradas com o agente real (deepseek-flash, via API compatível com OpenAI)
 scripts/     gerar_exemplos.py
 ```

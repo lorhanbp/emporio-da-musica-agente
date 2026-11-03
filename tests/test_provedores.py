@@ -87,12 +87,15 @@ def test_trava_de_encaminhamento_tambem_vale_na_anthropic(tmp_path, monkeypatch)
 
 
 def test_provedor_detectado_pelas_chaves(monkeypatch):
-    for v in ("EMPORIO_PROVEDOR", "DEEPSEEK_API_KEY", "EMPORIO_API_KEY", "ANTHROPIC_API_KEY"):
+    for v in ("EMPORIO_PROVEDOR", "EMPORIO_API_KEY", "ANTHROPIC_API_KEY"):
         monkeypatch.delenv(v, raising=False)
-    assert config._provedor() == "deepseek"
+    assert config._provedor() == "anthropic"  # padrão
     monkeypatch.setenv("ANTHROPIC_API_KEY", "x")
     assert config._provedor() == "anthropic"
-    monkeypatch.setenv("DEEPSEEK_API_KEY", "y")
-    assert config._provedor() == "deepseek"
-    monkeypatch.setenv("EMPORIO_PROVEDOR", "anthropic")
+    monkeypatch.delenv("ANTHROPIC_API_KEY")
+    monkeypatch.setenv("EMPORIO_API_KEY", "y")
+    assert config._provedor() == "openai"
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "x")
     assert config._provedor() == "anthropic"
+    monkeypatch.setenv("EMPORIO_PROVEDOR", "openai")
+    assert config._provedor() == "openai"

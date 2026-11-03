@@ -19,14 +19,14 @@ class Resposta:
 
 
 class ModeloOpenAI:
-    """DeepSeek (padrão) ou qualquer API compatível com OpenAI."""
+    """Qualquer API compatível com OpenAI (EMPORIO_API_KEY, EMPORIO_BASE_URL, EMPORIO_MODEL)."""
 
     def __init__(self, cliente=None):
         if cliente is None:
             from openai import OpenAI
 
             cliente = OpenAI(
-                api_key=os.getenv("EMPORIO_API_KEY") or os.getenv("DEEPSEEK_API_KEY"),
+                api_key=os.getenv("EMPORIO_API_KEY"),
                 base_url=config.BASE_URL,
                 max_retries=4,  # o SDK espera e repete em 429/5xx
             )
@@ -44,7 +44,7 @@ class ModeloOpenAI:
             temperature=0.3,
         )
         msg = r.choices[0].message
-        # model_dump mantém campos extras (ex.: reasoning_content), que a DeepSeek exige de volta nos turnos com ferramenta
+        # model_dump mantém campos extras (ex.: reasoning_content), que alguns modelos de raciocínio exigem de volta nos turnos com ferramenta
         return Resposta(
             msg.model_dump(exclude_none=True),
             (msg.content or "").strip(),
@@ -107,7 +107,11 @@ class ModeloAnthropic:
 
 
 def criar():
-    return ModeloAnthropic() if config.PROVEDOR == "anthropic" else ModeloOpenAI()
+    if config.PROVEDOR == "anthropic":
+        return ModeloAnthropic()
+    if not config.MODELO:
+        raise SystemExit("Com EMPORIO_PROVEDOR=openai defina também EMPORIO_MODEL (e EMPORIO_BASE_URL, se não for a OpenAI).")
+    return ModeloOpenAI()
 
 
 def erros_api() -> tuple:

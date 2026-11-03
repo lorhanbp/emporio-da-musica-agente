@@ -13,24 +13,23 @@ load_dotenv(RAIZ / ".env")  # antes das leituras abaixo
 
 
 def _provedor() -> str:
-    """EMPORIO_PROVEDOR manda; senão, só ANTHROPIC_API_KEY presente => anthropic; senão deepseek."""
+    """Anthropic por padrão. EMPORIO_PROVEDOR=openai (ou só EMPORIO_API_KEY definida) usa uma API compatível com OpenAI."""
     p = os.getenv("EMPORIO_PROVEDOR")
     if p:
         return p.lower()
-    tem_deepseek = os.getenv("DEEPSEEK_API_KEY") or os.getenv("EMPORIO_API_KEY")
-    return "anthropic" if os.getenv("ANTHROPIC_API_KEY") and not tem_deepseek else "deepseek"
+    return "openai" if os.getenv("EMPORIO_API_KEY") and not os.getenv("ANTHROPIC_API_KEY") else "anthropic"
 
 
 PROVEDOR = _provedor()
-MODELO = os.getenv("EMPORIO_MODEL") or ("claude-haiku-5-5" if PROVEDOR == "anthropic" else "deepseek-flash")
-VARIAVEL_DA_CHAVE = "ANTHROPIC_API_KEY" if PROVEDOR == "anthropic" else "DEEPSEEK_API_KEY"
+MODELO = os.getenv("EMPORIO_MODEL") or ("claude-haiku-5-5" if PROVEDOR == "anthropic" else None)
+BASE_URL = os.getenv("EMPORIO_BASE_URL")  # só para o provedor "openai"; vazio = api.openai.com
+VARIAVEL_DA_CHAVE = "ANTHROPIC_API_KEY" if PROVEDOR == "anthropic" else "EMPORIO_API_KEY"
 
 
 def tem_chave() -> bool:
-    return bool(os.getenv(VARIAVEL_DA_CHAVE) or (PROVEDOR != "anthropic" and os.getenv("EMPORIO_API_KEY")))
+    return bool(os.getenv(VARIAVEL_DA_CHAVE))
 
 
-BASE_URL = os.getenv("EMPORIO_BASE_URL", "https://api.deepseek.com")
 MAX_ITERACOES_TOOLS = 6
 MAX_MENSAGENS = 40  # histórico enviado ao modelo; o mais antigo é descartado
 
