@@ -49,6 +49,8 @@ cliente ──► CLI ──► Agente (loop de function calling) ──► Deep
 
 **Cálculo em código, texto no modelo.** Preço com promoção, PIX, parcela mínima, frete e prazos de devolução são calculados nas ferramentas. O LLM só escolhe a ferramenta e redige. Isso elimina uma classe inteira de alucinação numérica e deixa as regras testáveis (`tests/`).
 
+**Arquitetura de retrieval.** Não há busca vetorial: o catálogo e os pedidos são consultados por filtros estruturados (categoria, faixa de preço, termos normalizados sem acento, dono do pedido) e as políticas por tópico. O modelo escolhe o que consultar via function calling; o dado volta de código determinístico.
+
 **Políticas como ferramenta, não como prompt.** O PDF foi convertido para `data/politicas.md`, dividido em nove tópicos. A ferramenta `consultar_politicas` devolve só o trecho relevante. O prompt de sistema fica enxuto (persona + regras de ouro), e o modelo precisa *escolher* consultar o manual em vez de responder de memória. Com um manual tão curto, colocar tudo no prompt também funcionaria; escolhi a ferramenta pelo controle e pela clareza do trace (`--verbose`).
 
 **Modelo: `deepseek-flash` (DeepSeek, API compatível com OpenAI).** É o modelo mais barato da DeepSeek, com function calling nativo e bom português, o que combina com um chat de alto volume e baixa margem. Usei o SDK `openai` apontando para a DeepSeek: o código não fica preso a um provedor, e trocar de modelo ou de provedor é só configuração (`EMPORIO_MODEL`, `EMPORIO_BASE_URL`). Temperatura 0,3 para respostas consistentes. O loop de ferramentas é manual, para registrar cada chamada (`--verbose`) e controlar o histórico. O modelo devolve um `reasoning_content` nos turnos com ferramenta, que a API exige de volta; o histórico guarda a mensagem completa.
@@ -79,7 +81,7 @@ cliente ──► CLI ──► Agente (loop de function calling) ──► Deep
 - Não há verificação forte de identidade: e-mail/telefone são "algo que o cliente sabe", o que é fraco para um sistema real (um código por SMS/WhatsApp resolveria).
 - Busca de produtos por substring normalizada. "Violão" ≠ "violões" no texto livre; o filtro de categoria cobre os casos comuns, mas busca semântica (embeddings) ajudaria com sinônimos ("cavaco", "guitarra de 7 cordas") e perguntas vagas ("algo pra começar").
 - O horário da loja não conhece feriados; o `encaminhar_para_humano` só grava em arquivo, sem fila nem notificação.
-- O modelo às vezes diz que "vai encaminhar" sem chamar a ferramenta (aconteceu nos testes com o Gemini, que usei antes). Há uma trava no agente: se a resposta promete encaminhar/registrar e `encaminhar_para_humano` não foi chamada, o agente cobra o modelo antes de responder. A trava é por palavra-chave, então é uma rede de segurança, não garantia.
+- O modelo às vezes diz que "vai encaminhar" sem chamar a ferramenta (aconteceu nos testes). Há uma trava no agente: se a resposta promete encaminhar/registrar e `encaminhar_para_humano` não foi chamada, o agente cobra o modelo antes de responder. A trava é por palavra-chave, então é uma rede de segurança, não garantia.
 - Sem avaliação automatizada de qualidade das respostas. Com mais tempo: um conjunto de conversas com critérios (LLM-as-judge) rodando no CI, para pegar regressões de prompt.
 - O histórico enviado ao modelo é limitado às últimas ~40 mensagens (corte em turno de usuário); conversas muito longas perdem o começo.
 - Sem streaming nem canal real (WhatsApp); a interface é CLI.
@@ -98,7 +100,7 @@ Usei o **Claude Code** (Anthropic) como par de programação; o agente em si rod
 
 ```
 emporio/            código (dados, ferramentas, prompt, agente, CLI)
-data/               CSVs, PDF original e politicas.md (texto das políticas)
+data/               arquivos originais da empresa (CSVs e políticas_da_loja.pdf) + politicas.md (texto do PDF, por tópico)
 tests/              testes das ferramentas e do loop do agente (sem API)
 exemplos/           conversas de exemplo geradas com o agente real
 scripts/            gerar_exemplos.py

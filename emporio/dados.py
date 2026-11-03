@@ -28,7 +28,7 @@ def so_digitos(texto: str) -> str:
 
 
 def _ler(nome: str) -> list[dict]:
-    with open(DADOS / f"{nome}.csv", encoding="utf-8", newline="") as f:
+    with open(DADOS / f"desafio_tecnico_ai_eng - {nome}.csv", encoding="utf-8", newline="") as f:
         return [{k: v.strip() for k, v in linha.items()} for linha in csv.DictReader(f)]
 
 
