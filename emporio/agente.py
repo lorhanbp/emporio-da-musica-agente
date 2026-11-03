@@ -24,7 +24,8 @@ class Agente:
         self.mensagens: list[dict] = []
         if sessao:
             config.SESSOES.mkdir(exist_ok=True)
-            self.arquivo = config.SESSOES / f"{re.sub(r'[^\w-]', '_', sessao)}.json"
+            nome = re.sub(r"[^\w-]", "_", sessao)
+            self.arquivo = config.SESSOES / f"{nome}.json"
             if self.arquivo.exists():
                 self.mensagens = json.loads(self.arquivo.read_text(encoding="utf-8"))
 
