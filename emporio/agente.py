@@ -31,6 +31,7 @@ class Agente:
             max_retries=4,  # o SDK espera e repete em 429/5xx
         )
         self.verbose = verbose
+        self.ferramentas_da_rodada: list[str] = []
         self.arquivo = None
         self.mensagens: list[dict] = []
         if sessao:
@@ -71,6 +72,7 @@ class Agente:
     def _turno(self, texto: str) -> str | None:
         self.mensagens.append({"role": "user", "content": texto})
         chamou, cobrou = set(), False
+        self.ferramentas_da_rodada = []
         for _ in range(config.MAX_ITERACOES_TOOLS):
             r = self.cliente.chat.completions.create(
                 model=config.MODELO,
@@ -91,6 +93,7 @@ class Agente:
                 return final or None
             for c in msg.tool_calls:
                 chamou.add(c.function.name)
+                self.ferramentas_da_rodada.append(c.function.name)
                 try:
                     args = json.loads(c.function.arguments or "{}")
                     saida = executar(c.function.name, args)

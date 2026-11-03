@@ -13,6 +13,8 @@ cp .env.example .env        # preencha DEEPSEEK_API_KEY
 python -m emporio           # conversa no terminal
 ```
 
+Interface web para testar no navegador: `python -m emporio.web` e abra http://localhost:8000 (só local, usa sua chave).
+
 Opções do CLI:
 
 | flag | efeito |
