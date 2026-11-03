@@ -3,23 +3,21 @@ import argparse
 import os
 import sys
 
-import anthropic
-from dotenv import load_dotenv
+from google.genai import errors
 
 from . import config
 from .agente import Agente
 
 
 def main():
-    load_dotenv(config.RAIZ / ".env")
     ap = argparse.ArgumentParser(prog="emporio")
     ap.add_argument("--sessao", help="nome da sessão; guarda e retoma o histórico em .sessions/")
     ap.add_argument("--verbose", action="store_true", help="mostra as ferramentas chamadas")
     ap.add_argument("--transcricao", help="salva a conversa em markdown neste arquivo")
     args = ap.parse_args()
 
-    if not os.getenv("ANTHROPIC_API_KEY"):
-        sys.exit("Falta ANTHROPIC_API_KEY: copie .env.example para .env e preencha.")
+    if not os.getenv("GEMINI_API_KEY"):
+        sys.exit("Falta GEMINI_API_KEY: copie .env.example para .env e preencha.")
     agente = Agente(args.sessao, verbose=args.verbose)
     print("Empório da Música: atendimento (Ctrl+C ou 'sair' para encerrar)\n")
     transcricao = []
@@ -29,7 +27,7 @@ def main():
                 continue
             try:
                 resposta = agente.responder(texto)
-            except anthropic.APIError as e:
+            except errors.APIError as e:
                 print(f"\n[erro na API: {e.__class__.__name__}] tente de novo.\n")
                 continue
             print(f"\nMelô: {resposta}\n")

@@ -2,12 +2,17 @@ import os
 from datetime import date
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 RAIZ = Path(__file__).resolve().parent.parent
 DADOS = RAIZ / "data"
 SESSOES = RAIZ / ".sessions"
 
-MODELO = os.getenv("EMPORIO_MODEL", "claude-haiku-5-5")
+load_dotenv(RAIZ / ".env")  # antes das leituras abaixo
+
+MODELO = os.getenv("EMPORIO_MODEL", "gemini-2.5-flash")
 MAX_ITERACOES_TOOLS = 6
+MAX_TENTATIVAS = 5  # tentativas por chamada ao modelo (429/503)
 MAX_MENSAGENS = 40  # histórico enviado ao modelo; o mais antigo é descartado
 
 # Os CSVs são um retrato congelado (último pedido: 2026-03-22). Usar o relógio real

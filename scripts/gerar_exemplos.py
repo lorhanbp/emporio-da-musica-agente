@@ -1,13 +1,10 @@
 """Roda conversas roteirizadas contra o agente real e salva em exemplos/*.md.
-Uso: python scripts/gerar_exemplos.py   (precisa de ANTHROPIC_API_KEY)"""
+Uso: python scripts/gerar_exemplos.py [cenario ...]   (precisa de GEMINI_API_KEY)"""
 import sys
 from pathlib import Path
 
-from dotenv import load_dotenv
-
 RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
-load_dotenv(RAIZ / ".env")
 
 from emporio import config  # noqa: E402
 from emporio.agente import Agente  # noqa: E402
@@ -42,14 +39,15 @@ CENARIOS = {
 def main():
     destino = RAIZ / "exemplos"
     destino.mkdir(exist_ok=True)
-    for nome, falas in CENARIOS.items():
+    escolhidos = sys.argv[1:] or list(CENARIOS)
+    for nome in escolhidos:
+        falas = CENARIOS[nome]
         agente = Agente(verbose=False)
         linhas = [f"# {nome}\n", f"_Modelo: `{config.MODELO}` · data de referência: {config.HOJE}_\n"]
         for fala in falas:
             antes = len(agente.mensagens)
             resposta = agente.responder(fala)
-            usadas = [b["name"] for m in agente.mensagens[antes:] if m["role"] == "assistant" and isinstance(m["content"], list)
-                      for b in m["content"] if b["type"] == "tool_use"]
+            usadas = [p.function_call.name for m in agente.mensagens[antes:] for p in m.parts or [] if p.function_call]
             linhas += [f"**Cliente:** {fala}\n", f"**Melô:** {resposta}\n"]
             if usadas:
                 linhas.append(f"<sub>ferramentas nesta rodada: {', '.join(dict.fromkeys(usadas))}</sub>\n")
