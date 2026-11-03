@@ -1,5 +1,5 @@
 """Roda conversas roteirizadas contra o agente real e salva em exemplos/*.md.
-Uso: python scripts/gerar_exemplos.py [cenario ...]   (precisa de DEEPSEEK_API_KEY)"""
+Uso: python scripts/gerar_exemplos.py [cenario ...]   (precisa de uma chave de API, veja o README)"""
 import sys
 from pathlib import Path
 

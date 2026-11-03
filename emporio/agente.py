@@ -1,17 +1,10 @@
 import json
-import os
 import re
 
-from openai import OpenAI
-
-from . import config
-from .ferramentas import SCHEMAS, executar
+from . import config, modelos
+from .ferramentas import executar
 from .prompt import SYSTEM
 
-_TOOLS = [
-    {"type": "function", "function": {"name": s["name"], "description": s["description"], "parameters": s["input_schema"]}}
-    for s in SCHEMAS
-]
 _PROMETEU_ENCAMINHAR = re.compile(r"\b(encaminh|registr)\w*", re.I)
 _COBRANCA = (
     "[sistema] Sua resposta diz que encaminhou ou registrou algo, mas você não chamou "
@@ -21,15 +14,10 @@ _COBRANCA = (
 
 
 class Agente:
-    """Loop de function calling sobre uma API compatível com OpenAI (DeepSeek por padrão).
-    O histórico fica em disco por sessão."""
+    """Loop de function calling, independente de provedor (ver modelos.py). O histórico fica em disco por sessão."""
 
-    def __init__(self, sessao: str | None = None, cliente: OpenAI | None = None, verbose=False):
-        self.cliente = cliente or OpenAI(
-            api_key=os.getenv("EMPORIO_API_KEY") or os.getenv("DEEPSEEK_API_KEY"),
-            base_url=config.BASE_URL,
-            max_retries=4,  # o SDK espera e repete em 429/5xx
-        )
+    def __init__(self, sessao: str | None = None, modelo=None, verbose=False):
+        self.modelo = modelo or modelos.criar()
         self.verbose = verbose
         self.ferramentas_da_rodada: list[str] = []
         self.arquivo = None
@@ -74,32 +62,24 @@ class Agente:
         chamou, cobrou = set(), False
         self.ferramentas_da_rodada = []
         for _ in range(config.MAX_ITERACOES_TOOLS):
-            r = self.cliente.chat.completions.create(
-                model=config.MODELO,
-                messages=[{"role": "system", "content": SYSTEM}, *self.mensagens],
-                tools=_TOOLS,
-                temperature=0.3,
-            )
-            msg = r.choices[0].message
-            # model_dump mantém campos extras (ex.: reasoning_content), que a DeepSeek exige de volta nos turnos com ferramenta
-            self.mensagens.append(msg.model_dump(exclude_none=True))
-            if not msg.tool_calls:
-                final = (msg.content or "").strip()
+            r = self.modelo.gerar(SYSTEM, self.mensagens)
+            self.mensagens.append(r.mensagem)
+            if not r.chamadas:
                 # Trava: dizer "encaminhei" sem chamar a ferramenta é prometer uma ação que não aconteceu.
-                if _PROMETEU_ENCAMINHAR.search(final) and "encaminhar_para_humano" not in chamou and not cobrou:
+                if _PROMETEU_ENCAMINHAR.search(r.texto) and "encaminhar_para_humano" not in chamou and not cobrou:
                     cobrou = True
                     self.mensagens.append({"role": "user", "content": _COBRANCA})
                     continue
-                return final or None
-            for c in msg.tool_calls:
-                chamou.add(c.function.name)
-                self.ferramentas_da_rodada.append(c.function.name)
+                return r.texto or None
+            for id_chamada, nome, argumentos in r.chamadas:
+                chamou.add(nome)
+                self.ferramentas_da_rodada.append(nome)
                 try:
-                    args = json.loads(c.function.arguments or "{}")
-                    saida = executar(c.function.name, args)
+                    args = json.loads(argumentos)
+                    saida = executar(nome, args)
                 except json.JSONDecodeError:
-                    args, saida = c.function.arguments, json.dumps({"erro": "argumentos não são JSON válido"}, ensure_ascii=False)
+                    args, saida = argumentos, json.dumps({"erro": "argumentos não são JSON válido"}, ensure_ascii=False)
                 if self.verbose:
-                    print(f"  [tool] {c.function.name}({args}) -> {saida[:300]}")
-                self.mensagens.append({"role": "tool", "tool_call_id": c.id, "content": saida})
+                    print(f"  [tool] {nome}({args}) -> {saida[:300]}")
+                self.mensagens.append({"role": "tool", "tool_call_id": id_chamada, "content": saida})
         return None

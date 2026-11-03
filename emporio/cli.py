@@ -1,12 +1,10 @@
 """Uso: python -m emporio [--sessao NOME] [--verbose] [--transcricao ARQUIVO.md]"""
 import argparse
-import os
 import sys
-
-import openai
 
 from . import config
 from .agente import Agente
+from .modelos import erros_api
 
 
 def main():
@@ -16,10 +14,10 @@ def main():
     ap.add_argument("--transcricao", help="salva a conversa em markdown neste arquivo")
     args = ap.parse_args()
 
-    if not (os.getenv("EMPORIO_API_KEY") or os.getenv("DEEPSEEK_API_KEY")):
-        sys.exit("Falta DEEPSEEK_API_KEY: copie .env.example para .env e preencha.")
+    if not config.tem_chave():
+        sys.exit(f"Falta {config.VARIAVEL_DA_CHAVE}: copie .env.example para .env e preencha (veja o README).")
     agente = Agente(args.sessao, verbose=args.verbose)
-    print("Empório da Música: atendimento (Ctrl+C ou 'sair' para encerrar)\n")
+    print(f"Empório da Música: atendimento [{config.PROVEDOR}/{config.MODELO}] (Ctrl+C ou 'sair' para encerrar)\n")
     transcricao = []
     try:
         while (texto := input("Você: ").strip()) not in ("sair", "exit"):
@@ -27,7 +25,7 @@ def main():
                 continue
             try:
                 resposta = agente.responder(texto)
-            except openai.APIError as e:
+            except erros_api() as e:
                 print(f"\n[erro na API: {e.__class__.__name__}] tente de novo.\n")
                 continue
             print(f"\nMelô: {resposta}\n")

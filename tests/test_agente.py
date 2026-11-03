@@ -4,6 +4,7 @@ from openai.types.chat import ChatCompletionMessage
 from openai.types.chat.chat_completion_message_function_tool_call import ChatCompletionMessageFunctionToolCall, Function
 
 from emporio.agente import Agente
+from emporio.modelos import ModeloOpenAI
 
 
 def _texto(t):
@@ -37,7 +38,7 @@ class ClienteQuebrado(ClienteFalso):
 def test_loop_executa_ferramenta_e_devolve_texto(tmp_path, monkeypatch):
     monkeypatch.setattr("emporio.config.SESSOES", tmp_path)
     cliente = ClienteFalso()
-    a = Agente("teste", cliente=cliente)
+    a = Agente("teste", modelo=ModeloOpenAI(cliente))
     assert a.responder("Quanto custa o Takamine GD20?") == "Custa R$ 2.199."
     ultima = cliente.chamadas[1][-1]
     assert ultima["role"] == "tool" and ultima["tool_call_id"] == "c1" and '"preco_tabela": 2199' in ultima["content"]
@@ -46,13 +47,13 @@ def test_loop_executa_ferramenta_e_devolve_texto(tmp_path, monkeypatch):
 
 def test_historico_persiste_entre_sessoes(tmp_path, monkeypatch):
     monkeypatch.setattr("emporio.config.SESSOES", tmp_path)
-    Agente("s1", cliente=ClienteFalso()).responder("oi")
-    assert len(Agente("s1", cliente=ClienteFalso()).mensagens) == 4  # user, assistant(tool_calls), tool, assistant
+    Agente("s1", modelo=ModeloOpenAI(ClienteFalso())).responder("oi")
+    assert len(Agente("s1", modelo=ModeloOpenAI(ClienteFalso())).mensagens) == 4  # user, assistant(tool_calls), tool, assistant
 
 
 def test_falha_da_api_nao_corrompe_historico(tmp_path, monkeypatch):
     monkeypatch.setattr("emporio.config.SESSOES", tmp_path)
-    a = Agente("q", cliente=ClienteQuebrado())
+    a = Agente("q", modelo=ModeloOpenAI(ClienteQuebrado()))
     try:
         a.responder("oi")
     except RuntimeError:
@@ -62,7 +63,7 @@ def test_falha_da_api_nao_corrompe_historico(tmp_path, monkeypatch):
 
 def test_historico_e_aparado_sem_separar_chamada_de_resposta(monkeypatch):
     monkeypatch.setattr("emporio.config.MAX_MENSAGENS", 6)
-    a = Agente(cliente=ClienteFalso())
+    a = Agente(modelo=ModeloOpenAI(ClienteFalso()))
     a.mensagens = [
         {"role": "user", "content": "u"},
         {"role": "assistant", "content": None, "tool_calls": [{"id": "x"}]},
@@ -88,7 +89,7 @@ def test_cobra_ferramenta_quando_promete_encaminhar_sem_chamar(tmp_path, monkeyp
             return _texto("Pronto, a equipe retorna em 24h úteis.")
 
     cliente = Prometedor()
-    assert Agente(cliente=cliente).responder("tarraxa solta").startswith("Pronto")
+    assert Agente(modelo=ModeloOpenAI(cliente)).responder("tarraxa solta").startswith("Pronto")
     assert "[sistema]" in cliente.chamadas[1][-1]["content"]
     assert (tmp_path / "encaminhamentos.jsonl").exists()
 
@@ -105,7 +106,7 @@ def test_nao_cobra_quando_ja_chamou_a_ferramenta(tmp_path, monkeypatch):
             return _texto("Encaminhei para a equipe.")
 
     cliente = Certo()
-    assert Agente(cliente=cliente).responder("oi") == "Encaminhei para a equipe."
+    assert Agente(modelo=ModeloOpenAI(cliente)).responder("oi") == "Encaminhei para a equipe."
     assert len(cliente.chamadas) == 2
 
 
@@ -120,5 +121,5 @@ def test_argumentos_invalidos_viram_erro_para_o_modelo(tmp_path, monkeypatch):
             return _texto("Pode repetir?")
 
     cliente = Torto()
-    assert Agente(cliente=cliente).responder("oi") == "Pode repetir?"
+    assert Agente(modelo=ModeloOpenAI(cliente)).responder("oi") == "Pode repetir?"
     assert "não são JSON" in cliente.chamadas[1][-1]["content"]
