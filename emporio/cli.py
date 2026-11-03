@@ -1,6 +1,9 @@
 """Uso: python -m emporio [--sessao NOME] [--verbose] [--transcricao ARQUIVO.md]"""
 import argparse
+import os
+import sys
 
+import anthropic
 from dotenv import load_dotenv
 
 from . import config
@@ -15,6 +18,8 @@ def main():
     ap.add_argument("--transcricao", help="salva a conversa em markdown neste arquivo")
     args = ap.parse_args()
 
+    if not os.getenv("ANTHROPIC_API_KEY"):
+        sys.exit("Falta ANTHROPIC_API_KEY: copie .env.example para .env e preencha.")
     agente = Agente(args.sessao, verbose=args.verbose)
     print("Empório da Música: atendimento (Ctrl+C ou 'sair' para encerrar)\n")
     transcricao = []
@@ -22,7 +27,11 @@ def main():
         while (texto := input("Você: ").strip()) not in ("sair", "exit"):
             if not texto:
                 continue
-            resposta = agente.responder(texto)
+            try:
+                resposta = agente.responder(texto)
+            except anthropic.APIError as e:
+                print(f"\n[erro na API: {e.__class__.__name__}] tente de novo.\n")
+                continue
             print(f"\nMelô: {resposta}\n")
             transcricao += [f"**Cliente:** {texto}\n", f"**Melô:** {resposta}\n"]
     except (KeyboardInterrupt, EOFError):

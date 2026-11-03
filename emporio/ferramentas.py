@@ -147,15 +147,49 @@ def _clientes_do_contato(contato: str) -> list[dict]:
 def _verificar(contato: str, pedido_id: int | None) -> tuple[dict | None, dict | None]:
     """(cliente, erro). Mensagem de erro é genérica de propósito: não revela se o pedido existe."""
     clientes = _clientes_do_contato(contato)
+    pedido = carregar()["pedidos"].get(int(pedido_id)) if pedido_id is not None else None
+    if len(clientes) > 1 and pedido:  # e-mail repetido no cadastro: o dono do pedido desempata
+        clientes = [c for c in clientes if c["id"] == pedido["cliente_id"]]
     if len(clientes) > 1:
         return None, {"erro": "contato ambíguo: peça o telefone com DDD para identificar o cadastro"}
     if not clientes:
         return None, {"erro": "não encontrei cadastro com esse contato. Peça o e-mail ou telefone usado na compra"}
-    if pedido_id is not None:
-        pedido = carregar()["pedidos"].get(int(pedido_id))
-        if not pedido or pedido["cliente_id"] != clientes[0]["id"]:
-            return None, {"erro": f"não encontrei o pedido {pedido_id} para esse cadastro"}
+    if pedido_id is not None and (not pedido or pedido["cliente_id"] != clientes[0]["id"]):
+        return None, {"erro": f"não encontrei o pedido {pedido_id} para esse cadastro"}
     return clientes[0], None
+
+
+def _pagamento(codigo: str) -> str:
+    if codigo.startswith("credit_"):
+        return f"cartão de crédito em {codigo.split('_')[1]}"
+    return {"pix": "PIX", "debit": "cartão de débito", "boleto": "boleto"}.get(codigo, codigo)
+
+
+def _alertas(p: dict) -> list[str]:
+    """Inconsistências do pedido que o agente NÃO deve esconder nem 'resolver' inventando."""
+    db = carregar()["produtos"]
+    dias = (config.HOJE - date.fromisoformat(p["data"])).days
+    avisos = []
+    if p["status"] == "shipped" and p["previsao_entrega"]:
+        atraso = (config.HOJE - date.fromisoformat(p["previsao_entrega"])).days
+        if atraso > 0:
+            avisos.append(f"previsão de entrega venceu há {atraso} dias e o pedido segue como enviado: não prometa "
+                          "nova data, peça desculpas e encaminhe à equipe para checar com a transportadora")
+    if p["status"] == "pending" and dias > 3:
+        avisos.append(f"pagamento sem confirmação há {dias} dias (acima do normal): oriente e encaminhe à equipe")
+    if p["status"] == "confirmed" and dias > 12:
+        avisos.append(f"pedido confirmado há {dias} dias e ainda não enviado (acima do prazo normal): peça desculpas "
+                      "e encaminhe à equipe; não prometa data")
+    if p["status"] in ("pending", "confirmed"):
+        nao_vendaveis = [db[i["produto_id"]]["nome"] for i in p["itens"] if db[i["produto_id"]]["status"] != "active"]
+        if nao_vendaveis:
+            avisos.append(f"contém item fora de linha ou 'em breve' ({', '.join(nao_vendaveis)}): não prometa prazo, "
+                          "encaminhe à equipe")
+    soma = sum(db[i["produto_id"]]["preco_tabela"] * i["quantidade"] for i in p["itens"])
+    if abs(soma - p["total"]) > 0.5:
+        avisos.append(f"total registrado (R$ {p['total']:.2f}) difere da soma dos itens a preço de tabela atual "
+                      f"(R$ {soma:.2f}); não explique a diferença, informe o total registrado")
+    return avisos
 
 
 def _pedido_publico(pedido: dict) -> dict:
@@ -165,7 +199,7 @@ def _pedido_publico(pedido: dict) -> dict:
         "data_do_pedido": pedido["data"],
         "status": STATUS_PEDIDO[pedido["status"]],
         "total": pedido["total"],
-        "forma_de_pagamento": pedido["pagamento"],
+        "forma_de_pagamento": _pagamento(pedido["pagamento"]),
         "codigo_de_rastreio": pedido["rastreio"],
         "previsao_de_entrega": pedido["previsao_entrega"],
         "observacao": pedido["observacao"],
@@ -173,6 +207,7 @@ def _pedido_publico(pedido: dict) -> dict:
             {"produto": db["produtos"][i["produto_id"]]["nome"], "quantidade": i["quantidade"]}
             for i in pedido["itens"]
         ],
+        "alertas": _alertas(pedido),
     }
 
 
@@ -232,6 +267,15 @@ def avaliar_devolucao(contato: str, pedido_id: int, motivo: str) -> dict:
     if motivo not in regras:
         return {"erro": "motivo deve ser: arrependimento, preferencia ou defeito"}
     nomes = " ".join(normalizar(i["produto"]) for i in saida["pedido"]["itens"])
+    if motivo == "defeito":
+        if dias_compra <= 30:
+            caminho = "troca direto com a loja (até 30 dias da compra)"
+        elif dias_receb <= 90:
+            caminho = ("passou dos 30 dias de troca, mas está na garantia legal de 90 dias contra defeito de "
+                       "fabricação: registrar e encaminhar à equipe/gerência, sem prometer o resultado")
+        else:
+            caminho = "fora da garantia legal; orientar a acionar a garantia do fabricante (a loja intermedeia a pedido)"
+        regras["defeito"]["caminho"] = caminho
     return {
         **saida,
         "situacao": "pedido entregue",
@@ -240,8 +284,7 @@ def avaliar_devolucao(contato: str, pedido_id: int, motivo: str) -> dict:
         "condicoes": "embalagem original, sem uso, com acessórios e manuais. "
         "Arrependimento: reembolso na forma original em até 10 dias úteis, frete de devolução por conta da loja.",
         "possivel_item_nao_elegivel": "boquilha" in nomes,
-        "observacao": "Defeito fora dos 30 dias: acionar garantia do fabricante (a loja intermedeia se pedido); "
-        "o manual também cita garantia legal de 90 dias. Em caso de dúvida, encaminhar para a gerência.",
+        "observacao": "Mau uso, queda, umidade e reparo por terceiros não são cobertos. Em dúvida, encaminhar para a gerência.",
     }
 
 

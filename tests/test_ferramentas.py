@@ -103,3 +103,47 @@ def test_devolucao_pedido_cancelado():
     db = carregar()
     email = db["clientes"][db["pedidos"][17]["cliente_id"]]["email"]
     assert "já cancelado" in f.avaliar_devolucao(email, 17, "arrependimento")["situacao"]
+
+
+def _email(pedido_id):
+    from emporio.dados import carregar
+    db = carregar()
+    return db["clientes"][db["pedidos"][pedido_id]["cliente_id"]]["email"]
+
+
+def test_email_repetido_e_desempatado_pelo_dono_do_pedido():
+    r = f.consultar_pedidos("bruno.martins@jmail.com", 10)  # pedido do Bruno Carvalho Martins
+    assert r["pedidos"][0]["pedido_id"] == 10
+    assert "erro" in f.consultar_pedidos("bruno.martins@jmail.com", 1)  # pedido de outra pessoa
+
+
+def test_pedido_enviado_com_previsao_vencida_gera_alerta():
+    alertas = f.consultar_pedidos(_email(8), 8)["pedidos"][0]["alertas"]
+    assert any("venceu" in a for a in alertas)
+
+
+def test_pedido_confirmado_parado_gera_alerta():
+    assert any("não enviado" in a for a in f.consultar_pedidos(_email(9), 9)["pedidos"][0]["alertas"])
+
+
+def test_item_em_breve_em_pedido_aberto_gera_alerta():
+    assert any("em breve" in a for a in f.consultar_pedidos(_email(14), 14)["pedidos"][0]["alertas"])
+
+
+def test_total_diferente_da_soma_gera_alerta():
+    assert any("difere" in a for a in f.consultar_pedidos(_email(3), 3)["pedidos"][0]["alertas"])
+
+
+def test_pedido_normal_sem_alerta():
+    assert f.consultar_pedidos(_email(5), 5)["pedidos"][0]["alertas"] == []
+
+
+def test_defeito_apos_30_dias_cai_na_garantia_legal():
+    # pedido 7: comprado em 03/02 (48 dias), recebido ~17/02 (34 dias)
+    regra = f.avaliar_devolucao(_email(7), 7, "defeito")["regra_aplicavel"]
+    assert regra["dentro_do_prazo"] is False and "garantia legal" in regra["caminho"]
+
+
+def test_pagamento_legivel():
+    assert f.consultar_pedidos(_email(4), 4)["pedidos"][0]["forma_de_pagamento"] == "boleto"
+    assert "12x" in f.consultar_pedidos(_email(3), 3)["pedidos"][0]["forma_de_pagamento"]

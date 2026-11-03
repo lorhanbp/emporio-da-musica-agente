@@ -31,3 +31,33 @@ def test_historico_persiste_entre_sessoes(tmp_path, monkeypatch):
     monkeypatch.setattr("emporio.config.SESSOES", tmp_path)
     Agente("s1", cliente=ClienteFalso()).responder("oi")
     assert len(Agente("s1", cliente=ClienteFalso()).mensagens) == 4
+
+
+def test_falha_da_api_nao_corrompe_historico(tmp_path, monkeypatch):
+    monkeypatch.setattr("emporio.config.SESSOES", tmp_path)
+
+    class Quebrado:
+        messages = None
+
+        def __init__(self):
+            self.messages = self
+
+        def create(self, **kw):
+            raise RuntimeError("API fora")
+
+    a = Agente("q", cliente=Quebrado())
+    try:
+        a.responder("oi")
+    except RuntimeError:
+        pass
+    assert a.mensagens == []
+
+
+def test_historico_e_aparado_sem_separar_tool_use(tmp_path, monkeypatch):
+    monkeypatch.setattr("emporio.config.SESSOES", tmp_path)
+    monkeypatch.setattr("emporio.config.MAX_MENSAGENS", 6)
+    a = Agente(cliente=ClienteFalso())
+    a.mensagens = [{"role": "user", "content": "u1"}, {"role": "assistant", "content": [{"type": "text", "text": "a"}]}] * 6
+    a._aparar()
+    assert a.mensagens[0]["role"] == "user" and isinstance(a.mensagens[0]["content"], str)
+    assert len(a.mensagens) < 12

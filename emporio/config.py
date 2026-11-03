@@ -8,6 +8,7 @@ SESSOES = RAIZ / ".sessions"
 
 MODELO = os.getenv("EMPORIO_MODEL", "claude-haiku-5-5")
 MAX_ITERACOES_TOOLS = 6
+MAX_MENSAGENS = 40  # histórico enviado ao modelo; o mais antigo é descartado
 
 # Os CSVs são um retrato congelado (último pedido: 2026-03-22). Usar o relógio real
 # faria todo prazo de troca parecer vencido, então o "hoje" do agente é configurável.

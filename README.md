@@ -51,7 +51,7 @@ cliente ──► CLI ──► Agente (loop de function calling) ──► Clau
 
 **Persona e prompt.** Seguem o manual (seção 7.1): "informal mas profissional, como um amigo que entende de música". O prompt define quando usar cada ferramenta, regras de ouro (nunca inventar preço/estoque/prazo, promoção sempre com preço original, PIX não acumula com promoção) e o tratamento de fora de escopo e de tentativas de mudar as instruções.
 
-**Privacidade (LGPD).** Pedido só é consultado com e-mail ou telefone do cadastro *e* o pedido precisa pertencer a esse cliente. A mensagem de erro é igual para "pedido não existe" e "pedido é de outra pessoa". A resposta nunca traz telefone, e-mail ou endereço, só o primeiro nome. Dois clientes têm o mesmo e-mail (Bruno Martins), e nesse caso o agente pede o telefone.
+**Privacidade (LGPD).** Pedido só é consultado com e-mail ou telefone do cadastro *e* o pedido precisa pertencer a esse cliente. A mensagem de erro é igual para "pedido não existe" e "pedido é de outra pessoa". A resposta nunca traz telefone, e-mail ou endereço, só o primeiro nome. Dois clientes têm o mesmo e-mail (Bruno Martins): com o número do pedido, o dono do pedido desempata; sem ele, o agente pede o telefone.
 
 **Interface: CLI.** O foco é o agente. **Histórico:** em memória durante a conversa e em JSON por sessão (`--sessao`), para retomar um atendimento.
 
@@ -62,11 +62,12 @@ cliente ──► CLI ──► Agente (loop de function calling) ──► Clau
 - **Filtro de preço usa o preço efetivo** (promocional, quando há promoção ativa).
 - **Data de referência (`EMPORIO_HOJE`, padrão 2026-03-23).** Os CSVs são um retrato congelado (último pedido em 22/03/2026). Com o relógio real, todo prazo de devolução apareceria vencido. Os prazos são calculados contra essa data.
 - **Data de recebimento.** Não existe nos dados. Uso `estimated_delivery` dos pedidos entregues como aproximação, e o agente avisa que é estimativa.
-- **Prazo de defeito.** O manual diz 30 dias de troca (§4.2) e 90 dias de garantia legal (§8.1). A ferramenta devolve as duas janelas; o agente explica que após 30 dias entra a garantia e encaminha à equipe em caso de dúvida.
+- **Prazo de defeito.** O manual diz 30 dias de troca (§4.2) e 90 dias de garantia legal (§8.1). A ferramenta devolve um `caminho` explícito: até 30 dias da compra, troca direto; de 31 a 90 dias do recebimento, garantia legal (registrar e encaminhar à equipe, sem prometer resultado); depois, garantia do fabricante.
 - **Parcelamento.** A tabela do §3 diz "parcela mínima R$ 100" para crédito, mas §3.1 detalha faixas (até 3x sem mínimo, 4–6x R$ 80, 7–12x R$ 100). Segui o §3.1, que é mais específico.
 - **Contatos duplicados no manual.** Telefone (67) 3341-4444 (cabeçalho e dados da empresa) × WhatsApp (67) 3321-4500 (§7), e e-mail com e sem acento. O agente usa (67) 3341-4444 e `contato@emporiodamusica.com.br`.
 - **Catálogo.** O manual fala em "mais de 300 instrumentos" e inclui sopros, mas o CSV tem 65 produtos em 6 das 9 categorias (nenhum sopro, nenhuma corda orquestral). O agente só afirma o que está nos dados.
-- **Totais de pedido.** Os pedidos 3 e 20 têm total menor que a soma dos itens (provável desconto). Os pedidos mostram o total registrado.
+- **Inconsistências nos pedidos viram "alertas"** (`consultar_pedidos`), e o prompt manda o agente ser transparente, não prometer data e encaminhar à equipe. Casos achados na auditoria dos CSVs: pedido 8 "enviado" com previsão vencida há 23 dias; pedidos 9–12 confirmados há mais de 12 dias sem envio; pedidos pendentes há mais de 3 dias; pedido 14 com item "em breve"; pedidos 3 e 20 com total menor que a soma dos itens (o agente informa o total registrado e não inventa a causa).
+- **Parcelas fora do manual em pedidos históricos** (pedidos 9, 16 e 18 têm parcela abaixo do mínimo da §3.1). Não corrigi os dados; `simular_pagamento` aplica as regras do manual para vendas novas.
 - **Cancelamento antes do envio** não está no manual, então o agente encaminha à equipe em vez de prometer.
 
 ## Limitações conhecidas e próximos passos
@@ -75,6 +76,7 @@ cliente ──► CLI ──► Agente (loop de function calling) ──► Clau
 - Busca de produtos por substring normalizada. "Violão" ≠ "violões" no texto livre; o filtro de categoria cobre os casos comuns, mas busca semântica (embeddings) ajudaria com sinônimos ("cavaco", "guitarra de 7 cordas") e perguntas vagas ("algo pra começar").
 - O horário da loja não conhece feriados; o `encaminhar_para_humano` só grava em arquivo, sem fila nem notificação.
 - Sem avaliação automatizada de qualidade das respostas. Com mais tempo: um conjunto de conversas com critérios (LLM-as-judge) rodando no CI, para pegar regressões de prompt.
+- O histórico enviado ao modelo é limitado às últimas ~40 mensagens (corte em turno de usuário); conversas muito longas perdem o começo.
 - Sem streaming nem canal real (WhatsApp); a interface é CLI.
 - O estado de um pedido é lido do CSV; na prática viria de uma API/banco.
 
