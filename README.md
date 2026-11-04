@@ -1,132 +1,127 @@
-# Melô — agente de atendimento da Empório da Música
+# Melô — customer support agent for Empório da Música
 
-Protótipo de um agente de atendimento por texto para a loja fictícia Empório da Música (Campo Grande/MS), feito para o desafio técnico de AI Engineer da Artefact. A **Melô** responde sobre produtos (preço, estoque, promoção), políticas da loja (pagamento, troca, frete, garantia), status de pedidos e devoluções, e recusa com educação o que foge do escopo.
+Prototype of a text-based customer support agent for the fictional store Empório da Música (Campo Grande/MS, Brazil), built for Artefact's AI Engineer technical challenge. **Melô** answers questions about products (price, stock, promotions), store policies (payment, exchanges, shipping, warranty), order status and returns, and politely declines anything out of scope. The agent talks to customers in Brazilian Portuguese.
 
-## Para quem vai avaliar
+## For reviewers
 
-- **Sem rodar nada:** as 5 conversas completas estão em [`exemplos/`](exemplos/) (catálogo, preço e pagamento, loja e fora de escopo, devolução com regras da política, privacidade de pedido).
-- **Rodando:** o repositório **não traz chave de API** (o `.env` é ignorado pelo git de propósito). Você precisa de uma chave da Anthropic (`ANTHROPIC_API_KEY`); veja "Como rodar".
-- **Sobre os exemplos:** foram gerados com o agente de verdade usando `deepseek-flash` por uma API compatível com OpenAI, a chave disponível durante o desenvolvimento. O caminho padrão com Claude foi validado por testes automatizados, mas não foi executado contra a API real, então o texto das respostas pode variar um pouco.
-- **Os testes não precisam de chave:** `pytest -q`.
+- **Without running anything:** the 5 full conversations are in [`exemplos/`](exemplos/) (catalog, price and payment, store info and out of scope, a return under the policy rules, order privacy). They are in Portuguese, the language the agent speaks.
+- **Running it:** the repository **ships no API key** (`.env` is git-ignored on purpose). You need an Anthropic key (`ANTHROPIC_API_KEY`); see "How to run".
+- **About the examples:** they were generated with the real agent through the OpenAI-compatible adapter, using a non-Claude model (the only key available during development). The default Claude path is covered by automated tests but was not run against the real API, so the wording of the answers may vary slightly.
+- **Tests need no key:** `pytest -q`.
 
-## Como rodar
+## How to run
 
-Requisitos: Python 3.11+ e uma chave de API de um provedor.
+Requirements: Python 3.11+ and an Anthropic API key.
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env     # depois preencha UMA chave, veja abaixo
-python -m emporio        # conversa no terminal
+cp .env.example .env     # then set ANTHROPIC_API_KEY
+python -m emporio        # chat in the terminal
 ```
 
-**Provedor (edite o `.env`):**
+Set `ANTHROPIC_API_KEY` in `.env`. The default model is `claude-haiku-5-5` (override with `EMPORIO_MODEL`).
 
-| Provedor | Variáveis | Modelo padrão |
-|---|---|---|
-| Anthropic (padrão) | `ANTHROPIC_API_KEY` | `claude-haiku-5-5` (troque com `EMPORIO_MODEL`) |
-| Alternativa: qualquer API compatível com OpenAI | `EMPORIO_PROVEDOR=openai`, `EMPORIO_API_KEY`, `EMPORIO_BASE_URL`, `EMPORIO_MODEL` | nenhum; o modelo precisa suportar function calling |
+The Anthropic path is covered by automated tests that use the real SDK against a fake HTTP server.
 
-O caminho da Anthropic é coberto por testes automatizados que usam o SDK real contra um servidor HTTP falso. Sem `EMPORIO_PROVEDOR`, o padrão é a Anthropic (só `EMPORIO_API_KEY` definida, sem chave da Anthropic, escolhe o provedor compatível com OpenAI).
-
-Outros comandos:
+Other commands:
 
 ```bash
-python -m emporio.web          # chat no navegador em http://localhost:8000 (só local, usa a sua chave)
-python -m emporio --verbose    # mostra cada ferramenta chamada e o resultado
-python -m emporio --sessao x   # guarda e retoma o histórico em .sessions/x.json
+python -m emporio.web          # browser chat at http://localhost:8000 (local only, uses your key)
+python -m emporio --verbose    # shows every tool call and its result
+python -m emporio --sessao x   # saves and resumes history in .sessions/x.json
 python -m emporio --transcricao conversa.md
-python scripts/gerar_exemplos.py [cenario ...]   # regrava exemplos/*.md
+python scripts/gerar_exemplos.py [cenario ...]   # regenerates exemplos/*.md
 ```
 
-`EMPORIO_HOJE` (padrão `2026-03-23`) define o "hoje" do agente; veja "Tratamento dos dados e suposições".
+`EMPORIO_HOJE` (default `2026-03-23`) sets the agent's "today"; see "Data handling and assumptions".
 
-## Como funciona
+## How it works
 
-1. Chega uma mensagem do cliente (terminal ou página web).
-2. O agente envia ao modelo a conversa, o prompt de sistema (persona + regras) e a lista de ferramentas.
-3. O modelo responde direto ou pede para chamar uma ferramenta. Exemplos: `buscar_produtos` para um preço, `consultar_politicas` para regras de troca, `consultar_pedidos` para um pedido.
-4. A ferramenta roda em Python puro sobre os CSVs e devolve JSON. Todo número, data e prazo vem daqui, nunca do modelo.
-5. O resultado volta ao modelo, que pode chamar mais ferramentas e, por fim, escreve a resposta no tom da persona.
-6. O histórico é mantido (em memória e, opcionalmente, em disco por sessão) para a conversa ter contexto.
+1. A customer message arrives (terminal or web page).
+2. The agent sends the model the conversation, the system prompt (persona + rules) and the list of tools.
+3. The model either answers directly or asks to call a tool. Examples: `buscar_produtos` for a price, `consultar_politicas` for exchange rules, `consultar_pedidos` for an order.
+4. The tool runs in plain Python over the CSVs and returns JSON. Every number, date and deadline comes from here, never from the model.
+5. The result goes back to the model, which may call more tools and finally writes the answer in the persona's tone.
+6. History is kept (in memory and, optionally, on disk per session) so the conversation has context.
 
-Exemplo: *"Me arrependi da compra, posso devolver?"* → o modelo pede e-mail ou telefone e o número do pedido (sem isso ele não pode mostrar pedidos) → `avaliar_devolucao` confere o dono do pedido e calcula os dias desde a entrega contra o prazo de arrependimento de 7 dias → o modelo explica o resultado e oferece o que ainda é possível (garantia).
+Example: *"I regret the purchase, can I return it?"* → the model asks for an email or phone number and the order number (without them it cannot show orders) → `avaliar_devolucao` checks who owns the order and counts the days since delivery against the 7-day withdrawal period → the model explains the result and offers what is still possible (warranty).
 
-Proteções no loop: erros de ferramenta voltam ao modelo para ele se corrigir; se o modelo disser que encaminhou um caso sem chamar `encaminhar_para_humano`, o agente cobra e força uma nova tentativa; uma falha da API desfaz o histórico da rodada, para a próxima mensagem continuar funcionando.
+Safeguards in the loop: tool errors go back to the model so it can correct itself; if the model says it escalated a case without calling `encaminhar_para_humano`, the agent calls it out and forces a retry; an API failure rolls back that turn's history so the next message keeps working.
 
-## Arquitetura
+## Architecture
 
 ```
-cliente ──► CLI / web ──► Agente (loop de function calling) ──► provedor de LLM
-                              │                                      │
-                              └── ferramentas (Python puro) ◄────────┘
-                                   ├─ buscar_produtos / detalhes_produto          → CSVs em memória
-                                   ├─ consultar_pedidos / avaliar_devolucao       → CSVs + verificação de identidade
-                                   ├─ simular_pagamento                           → regras de pagamento e frete
+customer ──► CLI / web ──► Agent (function-calling loop) ──► LLM provider
+                              │                                   │
+                              └── tools (plain Python) ◄──────────┘
+                                   ├─ buscar_produtos / detalhes_produto          → CSVs in memory
+                                   ├─ consultar_pedidos / avaliar_devolucao       → CSVs + identity check
+                                   ├─ simular_pagamento                           → payment and shipping rules
                                    ├─ consultar_politicas / horario_da_loja_agora → data/politicas.md
                                    └─ encaminhar_para_humano                      → .sessions/encaminhamentos.jsonl
 ```
 
-Os adaptadores de provedor ficam em `emporio/modelos.py`. O histórico é sempre guardado num formato neutro (mensagens no estilo OpenAI); cada adaptador traduz para a API do seu provedor, então o loop do agente não muda de um provedor para outro.
+The provider adapters live in `emporio/modelos.py`. History is always stored in a neutral format (OpenAI-style messages); each adapter translates it to its provider's API, so the agent loop does not change from one provider to another.
 
-## Decisões técnicas
+## Technical decisions
 
-**Function calling, sem RAG nem agente de SQL.** Os dados são minúsculos (65 produtos, 20 pedidos, 8 páginas de políticas). Um pipeline de embeddings seria complexidade sem ganho de qualidade, e um agente de SQL deixaria o modelo escrever consultas sobre dados de clientes. Com ferramentas tipadas, o modelo decide *qual* ferramenta chamar (é isso que o desafio chama de "saber quando consultar dados e quando consultar políticas") e o Python garante o resultado.
+**Function calling, no RAG and no SQL agent.** The data is tiny (65 products, 20 orders, 8 policy pages). An embeddings pipeline would add complexity with no quality gain, and a SQL agent would let the model write queries over customer data. With typed tools, the model decides *which* tool to call (this is what the challenge calls "knowing when to query data and when to query policies") and Python guarantees the result.
 
-**Cálculo em código, texto no modelo.** Preço com promoção, PIX, parcela mínima, frete e prazos de devolução são calculados nas ferramentas. O LLM só escolhe a ferramenta e redige. Isso elimina uma classe inteira de alucinação numérica e deixa as regras testáveis (`tests/`).
+**Calculation in code, text in the model.** Promotional price, PIX discount, minimum installment, shipping and return deadlines are computed in the tools. The LLM only picks the tool and writes the reply. This removes a whole class of numeric hallucination and makes the rules testable (`tests/`).
 
-**Arquitetura de retrieval.** Não há busca vetorial: o catálogo e os pedidos são consultados por filtros estruturados (categoria, faixa de preço, termos normalizados sem acento, dono do pedido) e as políticas por tópico. O modelo escolhe o que consultar via function calling; o dado volta de código determinístico.
+**Retrieval architecture.** There is no vector search: the catalog and orders are queried with structured filters (category, price range, accent-normalized terms, order owner) and policies by topic. The model chooses what to query through function calling; the data comes back from deterministic code.
 
-**Políticas como ferramenta, não como prompt.** O PDF foi convertido para `data/politicas.md`, dividido em nove tópicos. A ferramenta `consultar_politicas` devolve só o trecho relevante. O prompt de sistema fica enxuto (persona + regras de ouro), e o modelo precisa *escolher* consultar o manual em vez de responder de memória. Com um manual tão curto, colocar tudo no prompt também funcionaria; escolhi a ferramenta pelo controle e pela clareza do trace (`--verbose`).
+**Policies as a tool, not as a prompt.** The PDF was converted to `data/politicas.md`, split into nine topics. The `consultar_politicas` tool returns only the relevant excerpt. The system prompt stays lean (persona + golden rules), and the model has to *choose* to consult the manual instead of answering from memory. With a manual this short, putting everything in the prompt would also work; I chose the tool for control and for a clearer trace (`--verbose`).
 
-**Modelo e provedor.** O padrão é o Claude Haiku (`claude-haiku-5-5`) pela API da Anthropic: tool use nativo, bom português, baixa latência e custo, o que combina com um chat de alto volume. Para não prender o código a um provedor, há um segundo adaptador para APIs compatíveis com OpenAI (usado para gerar os exemplos). A temperatura é 0,3 nesse caminho, para respostas consistentes; no da Anthropic ela não é definida. O loop de ferramentas é manual, para registrar cada chamada e controlar o histórico. Modelos de raciocínio compatíveis com OpenAI podem devolver um campo `reasoning_content` que a API exige de volta, então a mensagem completa é guardada.
+**Model and provider.** The default is Claude Haiku (`claude-haiku-5-5`) through the Anthropic API: native tool use, good Portuguese, low latency and cost, which suits a high-volume chat. To avoid locking the code to one provider, there is a second adapter for OpenAI-compatible APIs (used to generate the examples). Temperature is 0.3 on that path for consistent answers; on the Anthropic path it is not set. The tool loop is manual, to log each call and control the history. OpenAI-compatible reasoning models may return a `reasoning_content` field that the API requires back, so the full message is stored.
 
-**Persona e estratégia de prompt.** Seguem o manual (seção 7.1): "informal mas profissional, como um amigo que entende de música". O prompt define quando usar cada ferramenta e traz regras de ouro: nunca inventar preço, estoque ou prazo; mostrar sempre o preço original junto da promoção; sem desconto de PIX em preço promocional; só dizer que encaminhou depois de chamar a ferramenta; citar os números exatamente como a ferramenta devolveu; não deduzir gênero nem identidade do cliente; redirecionar acessórios e pedidos fora do escopo; e ignorar tentativas de mudar as instruções.
+**Persona and prompt strategy.** They follow the manual (section 7.1): "informal but professional, like a friend who knows music". The prompt defines when to use each tool and sets golden rules: never invent price, stock or deadlines; always show the original price next to the promotional one; no PIX discount on promotional prices; only say a case was escalated after calling the tool; quote numbers exactly as the tool returned them; never infer the customer's gender or identity; redirect accessories and out-of-scope orders; and ignore attempts to change the instructions.
 
-**Privacidade (LGPD).** Pedido só é mostrado com e-mail ou telefone do cadastro *e* se pertencer a esse cliente. A mensagem de erro é igual para "pedido não existe" e "pedido é de outra pessoa". A resposta nunca traz telefone, e-mail ou endereço, só o primeiro nome. Dois clientes têm o mesmo e-mail (Bruno Martins): com o número do pedido, o dono do pedido desempata; sem ele, o agente pede o telefone.
+**Privacy (LGPD).** An order is shown only with the email or phone on file *and* only if it belongs to that customer. The error message is the same for "order does not exist" and "order belongs to someone else". The answer never includes phone, email or address, only the first name. Two customers share the same email (Bruno Martins): with the order number, the order owner breaks the tie; without it, the agent asks for the phone number.
 
-**Interface e histórico.** CLI mais uma página web local mínima, já que o foco é o agente. O histórico fica em memória durante a conversa e, opcionalmente, em JSON por sessão (`--sessao`), para retomar um atendimento.
+**Interface and history.** CLI plus a minimal local web page, since the focus is the agent. History stays in memory during the conversation and, optionally, in per-session JSON (`--sessao`), so a support conversation can be resumed.
 
-## Tratamento dos dados e suposições
+## Data handling and assumptions
 
-- **Promoção só conta se `is_active=1`.** Se houver mais de uma ativa para o mesmo produto, vale a maior (o manual diz que não acumulam).
-- **Disponível para compra = `status=active` e estoque > 0.** O Giannini GF-3D está "ativo" com estoque 0, e o Kala KA-ABP-CTG está "em breve" com estoque 2. Nenhum dos dois é vendável.
-- **Filtro de preço usa o preço efetivo** (promocional, quando há promoção ativa).
-- **Data de referência (`EMPORIO_HOJE`, padrão 2026-03-23).** Os CSVs são um retrato congelado (último pedido em 22/03/2026). Com o relógio real, todo prazo de devolução apareceria vencido. Os prazos são calculados contra essa data.
-- **Data de recebimento.** Não existe nos dados. Uso `estimated_delivery` dos pedidos entregues como aproximação, e o agente avisa que é estimativa.
-- **Prazo de defeito.** O manual diz 30 dias de troca (§4.2) e 90 dias de garantia legal (§8.1). A ferramenta devolve um caminho explícito: até 30 dias da compra, troca direto; de 31 a 90 dias do recebimento, garantia legal (registrar e encaminhar à equipe, sem prometer resultado); depois, garantia do fabricante.
-- **Parcelamento.** A tabela do §3 diz "parcela mínima R$ 100" para crédito, mas o §3.1 detalha faixas (até 3x sem mínimo, 4–6x R$ 80, 7–12x R$ 100). Segui o §3.1, que é mais específico.
-- **Contatos duplicados no manual.** Telefone (67) 3341-4444 (cabeçalho e dados da empresa) × WhatsApp (67) 3321-4500 (§7), e e-mail com e sem acento. O agente usa (67) 3341-4444 e `contato@emporiodamusica.com.br`.
-- **Catálogo.** O manual fala em "mais de 300 instrumentos" e inclui sopros, mas o CSV tem 65 produtos em 6 das 9 categorias (nenhum sopro, nenhuma corda orquestral). O agente só afirma o que está nos dados.
-- **Inconsistências nos pedidos viram "alertas"** (`consultar_pedidos`), e o prompt manda o agente ser transparente, não prometer data e encaminhar à equipe. Casos achados na auditoria dos CSVs: pedido 8 "enviado" com previsão vencida há 23 dias; pedidos 9–12 confirmados há mais de 12 dias sem envio; pedidos pendentes há mais de 3 dias; pedido 14 com item "em breve"; pedidos 3 e 20 com total menor que a soma dos itens (o agente informa o total registrado e não inventa a causa).
-- **Parcelas fora do manual em pedidos históricos** (pedidos 9, 16 e 18 têm parcela abaixo do mínimo da §3.1). Não corrigi os dados; `simular_pagamento` aplica as regras do manual para vendas novas.
-- **Cancelamento antes do envio** não está no manual, então o agente encaminha à equipe em vez de prometer.
+- **A promotion counts only if `is_active=1`.** If more than one is active for the same product, the largest applies (the manual says they do not stack).
+- **Available for purchase = `status=active` and stock > 0.** The Giannini GF-3D is "active" with stock 0, and the Kala KA-ABP-CTG is "coming soon" with stock 2. Neither is sellable.
+- **The price filter uses the effective price** (promotional, when a promotion is active).
+- **Reference date (`EMPORIO_HOJE`, default 2026-03-23).** The CSVs are a frozen snapshot (last order on 2026-03-22). With the real clock, every return deadline would show as expired. Deadlines are computed against this date.
+- **Delivery date.** It does not exist in the data. I use `estimated_delivery` of delivered orders as an approximation, and the agent says it is an estimate.
+- **Defect deadline.** The manual says 30 days for exchange (§4.2) and 90 days of legal warranty (§8.1). The tool returns an explicit path: up to 30 days from purchase, direct exchange; from 31 to 90 days from delivery, legal warranty (register and forward to the team, without promising an outcome); after that, manufacturer warranty.
+- **Installments.** The §3 table says "minimum installment R$ 100" for credit, but §3.1 details tiers (up to 3x with no minimum, 4–6x R$ 80, 7–12x R$ 100). I followed §3.1, which is more specific.
+- **Duplicate contacts in the manual.** Phone (67) 3341-4444 (header and company data) vs. WhatsApp (67) 3321-4500 (§7), and email with and without an accent. The agent uses (67) 3341-4444 and `contato@emporiodamusica.com.br`.
+- **Catalog.** The manual mentions "more than 300 instruments" and includes wind instruments, but the CSV has 65 products in 6 of the 9 categories (no winds, no orchestral strings). The agent only states what is in the data.
+- **Inconsistencies in orders become "alerts"** (`consultar_pedidos`), and the prompt tells the agent to be transparent, not promise a date, and escalate to the team. Cases found when auditing the CSVs: order 8 "shipped" with an estimate overdue by 23 days; orders 9–12 confirmed more than 12 days ago without shipping; orders pending for more than 3 days; order 14 with a "coming soon" item; orders 3 and 20 with a total lower than the sum of their items (the agent reports the recorded total and does not invent the cause).
+- **Installments outside the manual in historical orders** (orders 9, 16 and 18 have an installment below the §3.1 minimum). I did not fix the data; `simular_pagamento` applies the manual's rules to new sales.
+- **Cancellation before shipping** is not in the manual, so the agent escalates to the team instead of promising anything.
 
-## Limitações conhecidas e próximos passos
+## Known limitations and next steps
 
-- Não há verificação forte de identidade: e-mail e telefone são "algo que o cliente sabe", o que é fraco para um sistema real (um código por SMS ou WhatsApp resolveria).
-- A busca de produtos é por substring normalizada, sem acento. O filtro de categoria cobre os casos comuns, mas busca semântica (embeddings) ajudaria com sinônimos e perguntas vagas ("algo pra começar").
-- O horário da loja não conhece feriados; o `encaminhar_para_humano` só grava em arquivo, sem fila nem notificação.
-- Os modelos às vezes dizem que "vão encaminhar" sem chamar a ferramenta (aconteceu nos testes). O agente detecta por palavra-chave e força uma nova tentativa. É uma rede de segurança, não uma garantia.
-- Sem avaliação automatizada de qualidade das respostas. Com mais tempo: um conjunto de conversas roteirizadas com critérios de aprovação (LLM-as-judge) no CI, para pegar regressões de prompt.
-- O histórico enviado ao modelo é limitado às últimas ~40 mensagens (corte em turno de usuário); conversas muito longas perdem o começo.
-- O caminho da Anthropic não foi executado contra a API real, só contra um servidor HTTP falso usando o SDK de verdade.
-- Sem streaming nem canal real (WhatsApp); o estado dos pedidos vem de CSV, e na prática viria de uma API ou banco.
+- There is no strong identity verification: email and phone are "something the customer knows", which is weak for a real system (a code by SMS or WhatsApp would fix it).
+- Product search is by accent-normalized substring. The category filter covers common cases, but semantic search (embeddings) would help with synonyms and vague questions ("something to get started").
+- Store hours do not know about holidays; `encaminhar_para_humano` only writes to a file, with no queue or notification.
+- Models sometimes say they "will escalate" without calling the tool (this happened in testing). The agent detects it by keyword and forces a retry. It is a safety net, not a guarantee.
+- No automated evaluation of answer quality. With more time: a set of scripted conversations with pass criteria (LLM-as-judge) in CI, to catch prompt regressions.
+- The history sent to the model is limited to the last ~40 messages (cut at a user turn); very long conversations lose their beginning.
+- The Anthropic path was not run against the real API, only against a fake HTTP server using the real SDK.
+- No streaming and no real channel (WhatsApp); order state comes from CSV, and in practice would come from an API or database.
 
-## Uso de assistentes de código
+## Use of coding assistants
 
-Usei o **Claude Code** (Anthropic) como assistente de programação. O agente em si usa a API da Anthropic (ou outra compatível com OpenAI). Como foi usado:
+I used **Claude Code** (Anthropic) as a programming assistant. The agent itself uses the Anthropic API (or another OpenAI-compatible one). How it was used:
 
-- Ele auditou os CSVs e o manual atrás de armadilhas (e-mail duplicado, estoque 0 em produto "ativo", promoções inativas, contradições no manual). As suposições acima vêm dessa análise.
-- A partir dos requisitos do desafio, escreveu as primeiras versões dos módulos, dos testes e deste documento, que depois passaram por várias rodadas de ajuste ao rodar o agente com o modelo real e ler as conversas.
-- As regras de negócio (prazos de devolução, parcelamento, verificação do dono do pedido) têm testes automatizados em `tests/`; as conversas de exemplo foram geradas rodando o agente de verdade, não escritas à mão.
+- It audited the CSVs and the manual for traps (duplicate email, zero stock on an "active" product, inactive promotions, contradictions in the manual). The assumptions above come from that analysis.
+- From the challenge requirements, it wrote the first versions of the modules, the tests and this document, which then went through several rounds of adjustment by running the agent with the real model and reading the conversations.
+- The business rules (return deadlines, installments, order-owner verification) have automated tests in `tests/`; the example conversations were generated by running the real agent, not written by hand.
 
-## Estrutura do projeto
+## Project structure
 
 ```
-emporio/     código (dados, ferramentas, prompt, agente, adaptadores de provedor, CLI, página web)
-data/        arquivos originais da empresa (CSVs e políticas_da_loja.pdf) + politicas.md (o PDF em texto, por tópico)
-tests/       testes das ferramentas, do loop do agente e dos provedores (sem chave de API)
-exemplos/    conversas de exemplo geradas com o agente real (deepseek-flash, via API compatível com OpenAI)
+emporio/     code (data, tools, prompt, agent, provider adapters, CLI, web page)
+data/        the company's original files (CSVs and politicas_da_loja.pdf) + politicas.md (the PDF as text, by topic)
+tests/       tests for the tools, the agent loop and the providers (no API key needed)
+exemplos/    example conversations generated with the real agent (via the OpenAI-compatible adapter, not Claude)
 scripts/     gerar_exemplos.py
 ```
